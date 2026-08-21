@@ -3,12 +3,18 @@ from decimal import Decimal
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from django.contrib.auth import get_user_model
 
 from books.models import Book
 
 
 class BookApiTests(APITestCase):
     def setUp(self):
+        self.admin = get_user_model().objects.create_user(
+            username="admin",
+            password="testpass123",
+            is_staff=True,
+        )
         self.book = Book.objects.create(
             title="Clean Code",
             author="Robert C. Martin",
@@ -34,6 +40,7 @@ class BookApiTests(APITestCase):
         self.assertEqual(response.data["author"], "Robert C. Martin")
 
     def test_create_book(self):
+        self.client.force_authenticate(self.admin)
         payload = {
             "title": "The Pragmatic Programmer",
             "author": "Andrew Hunt",
@@ -55,6 +62,7 @@ class BookApiTests(APITestCase):
         )
 
     def test_update_book(self):
+        self.client.force_authenticate(self.admin)
         payload = {
             "title": "Clean Code Updated",
         }
@@ -74,6 +82,7 @@ class BookApiTests(APITestCase):
         )
 
     def test_delete_book(self):
+        self.client.force_authenticate(self.admin)
         response = self.client.delete(
             reverse("book-detail", args=[self.book.id])
         )
@@ -84,4 +93,126 @@ class BookApiTests(APITestCase):
         )
         self.assertFalse(
             Book.objects.filter(id=self.book.id).exists()
+        )
+
+
+class BookPermissionTests(APITestCase):
+    def setUp(self):
+        self.book = Book.objects.create(
+            title="Clean Code",
+            author="Robert C. Martin",
+            cover=Book.CoverType.HARD,
+            inventory=5,
+            daily_fee=Decimal("1.50"),
+        )
+
+        self.user = get_user_model().objects.create_user(
+            username="user",
+            password="testpass123",
+        )
+
+        self.admin = get_user_model().objects.create_user(
+            username="admin",
+            password="testpass123",
+            is_staff=True,
+        )
+
+        self.payload = {
+            "title": "New Book",
+            "author": "Some Author",
+            "cover": Book.CoverType.SOFT,
+            "inventory": 3,
+            "daily_fee": "2.00",
+        }
+
+    def test_unauthenticated_user_can_list_books(self):
+        response = self.client.get(reverse("book-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_unauthenticated_user_cannot_create_book(self):
+        response = self.client.post(
+            reverse("book-list"),
+            self.payload,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_authenticated_non_admin_cannot_create_book(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            reverse("book-list"),
+            self.payload,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_admin_can_create_book(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.post(
+            reverse("book-list"),
+            self.payload,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+    def test_non_admin_cannot_update_book(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.patch(
+            reverse("book-detail", args=[self.book.id]),
+            {"title": "Updated"},
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_admin_can_update_book(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.patch(
+            reverse("book-detail", args=[self.book.id]),
+            {"title": "Updated"},
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+    def test_non_admin_cannot_delete_book(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.delete(
+            reverse("book-detail", args=[self.book.id]),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_admin_can_delete_book(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.delete(
+            reverse("book-detail", args=[self.book.id]),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
         )
