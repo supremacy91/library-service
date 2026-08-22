@@ -195,3 +195,149 @@ class BorrowingCreateTests(APITestCase):
             response.status_code,
             status.HTTP_401_UNAUTHORIZED,
         )
+
+
+class BorrowingFilteringTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="user@test.com",
+            password="testpass123",
+        )
+        self.other_user = get_user_model().objects.create_user(
+            email="other@test.com",
+            password="testpass123",
+        )
+        self.admin = get_user_model().objects.create_user(
+            email="admin@test.com",
+            password="testpass123",
+            is_staff=True,
+        )
+
+        self.book = Book.objects.create(
+            title="Clean Code",
+            author="Robert C. Martin",
+            cover=Book.CoverType.HARD,
+            inventory=10,
+            daily_fee="1.50",
+        )
+
+        self.user_active_borrowing = Borrowing.objects.create(
+            expected_return_date=date(2026, 9, 1),
+            book=self.book,
+            user=self.user,
+        )
+
+        self.user_returned_borrowing = Borrowing.objects.create(
+            expected_return_date=date(2026, 8, 1),
+            actual_return_date=date(2026, 8, 1),
+            book=self.book,
+            user=self.user,
+        )
+
+        self.other_user_borrowing = Borrowing.objects.create(
+            expected_return_date=date(2026, 9, 1),
+            book=self.book,
+            user=self.other_user,
+        )
+
+    def test_non_admin_sees_only_own_borrowings(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get(
+            reverse("borrowings:borrowing-list")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(len(response.data), 2)
+
+        borrowing_ids = [
+            borrowing["id"]
+            for borrowing in response.data
+        ]
+
+        self.assertIn(
+            self.user_active_borrowing.id,
+            borrowing_ids,
+        )
+        self.assertIn(
+            self.user_returned_borrowing.id,
+            borrowing_ids,
+        )
+        self.assertNotIn(
+            self.other_user_borrowing.id,
+            borrowing_ids,
+        )
+
+    def test_admin_sees_all_borrowings(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get(
+            reverse("borrowings:borrowing-list")
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(len(response.data), 3)
+
+    def test_admin_can_filter_by_user_id(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get(
+            reverse("borrowings:borrowing-list"),
+            {"user_id": self.user.id},
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(len(response.data), 2)
+
+        for borrowing in response.data:
+            self.assertEqual(
+                borrowing["user"],
+                self.user.id,
+            )
+
+    def test_filter_active_borrowings(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get(
+            reverse("borrowings:borrowing-list"),
+            {"is_active": "true"},
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(len(response.data), 1)
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.user_active_borrowing.id,
+        )
+
+    def test_filter_inactive_borrowings(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get(
+            reverse("borrowings:borrowing-list"),
+            {"is_active": "false"},
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(len(response.data), 1)
+
+        self.assertEqual(
+            response.data[0]["id"],
+            self.user_returned_borrowing.id,
+        )

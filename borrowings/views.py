@@ -10,8 +10,34 @@ from borrowings.serializers import (
 
 
 class BorrowingListView(generics.ListCreateAPIView):
-    queryset = Borrowing.objects.select_related("book", "user")
     permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        queryset = Borrowing.objects.select_related(
+            "book",
+            "user",
+        )
+
+        user = self.request.user
+
+        if not user.is_staff:
+            queryset = queryset.filter(user=user)
+        else:
+            user_id = self.request.query_params.get("user_id")
+
+            if user_id:
+                queryset = queryset.filter(user_id=user_id)
+
+        is_active = self.request.query_params.get("is_active")
+
+        if is_active is not None:
+            is_active = is_active.lower() == "true"
+
+            queryset = queryset.filter(
+                actual_return_date__isnull=is_active
+            )
+
+        return queryset
 
     def get_serializer_class(self):
         if self.request.method == "POST":
