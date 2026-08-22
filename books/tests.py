@@ -11,7 +11,7 @@ from books.models import Book
 class BookApiTests(APITestCase):
     def setUp(self):
         self.admin = get_user_model().objects.create_user(
-            username="admin",
+            email="admin@test.com",
             password="testpass123",
             is_staff=True,
         )
@@ -107,12 +107,12 @@ class BookPermissionTests(APITestCase):
         )
 
         self.user = get_user_model().objects.create_user(
-            username="user",
+            email="user@test.com",
             password="testpass123",
         )
 
         self.admin = get_user_model().objects.create_user(
-            username="admin",
+            email="admin@test.com",
             password="testpass123",
             is_staff=True,
         )
@@ -138,7 +138,7 @@ class BookPermissionTests(APITestCase):
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_403_FORBIDDEN,
+            status.HTTP_401_UNAUTHORIZED,
         )
 
     def test_authenticated_non_admin_cannot_create_book(self):
