@@ -8,7 +8,35 @@ from borrowings.serializers import (
     BorrowingSerializer,
 )
 
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiTypes,
+    extend_schema,
+)
 
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter(
+            name="user_id",
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description=(
+                "Filter borrowings by user ID. "
+                "Available for staff users."
+            ),
+        ),
+        OpenApiParameter(
+            name="is_active",
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            description=(
+                "Filter borrowings by active status. "
+                "true = not returned, false = returned."
+            ),
+        ),
+    ]
+)
 class BorrowingListView(generics.ListCreateAPIView):
     permission_classes = (IsAuthenticated,)
 
