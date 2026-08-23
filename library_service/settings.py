@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "books",
     "users",
     "borrowings",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
@@ -136,4 +137,13 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "users.authentication.CustomJWTAuthentication",
     ),
+    "DEFAULT_SCHEMA_CLASS": (
+        "drf_spectacular.openapi.AutoSchema"
+    ),
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Library Service API",
+    "DESCRIPTION": "API for managing books, users and borrowings.",
+    "VERSION": "1.0.0",
 }
