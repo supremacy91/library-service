@@ -84,6 +84,17 @@ class BorrowingListView(generics.ListCreateAPIView):
 
 
 class BorrowingDetailView(generics.RetrieveAPIView):
-    queryset = Borrowing.objects.select_related("book", "user")
     serializer_class = BorrowingSerializer
     permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        queryset = Borrowing.objects.select_related(
+            "book",
+            "user",
+        )
+
+        if self.request.user.is_staff:
+            return queryset
+
+        return queryset.filter(user=self.request.user)
+

@@ -341,3 +341,19 @@ class BorrowingFilteringTests(APITestCase):
             response.data[0]["id"],
             self.user_returned_borrowing.id,
         )
+
+
+    def test_non_owner_cannot_retrieve_borrowing(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get(
+            reverse(
+                "borrowings:borrowing-detail",
+                args=[self.other_user_borrowing.id],
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
